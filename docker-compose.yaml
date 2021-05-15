@@ -1,0 +1,18 @@
+version: '3.1'
+
+services:
+
+  db:
+    image: postgres:11-alpine
+    restart: always
+    volumes:
+      - db:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: dbuser
+      POSTGRES_PASSWORD: dbpwd
+      POSTGRES_DB: app
+
+volumes:
+  db:

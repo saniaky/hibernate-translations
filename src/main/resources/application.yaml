@@ -1,0 +1,17 @@
+server:
+  port: 8080
+spring:
+  main:
+    banner-mode: off
+  jpa:
+    hibernate:
+      ddl-auto: none
+  datasource:
+    initialization-mode: always
+    platform: postgres
+    url: jdbc:postgresql://localhost:5432/app
+    username: dbuser
+    password: dbpwd
+logging:
+  level:
+    org.springframework: ERROR
