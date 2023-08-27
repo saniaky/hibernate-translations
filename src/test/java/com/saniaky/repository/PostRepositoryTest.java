@@ -5,8 +5,12 @@ import com.saniaky.entity.translation.StatusTranslation;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import javax.persistence.EntityManager;
 import javax.persistence.Tuple;
@@ -15,18 +19,26 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase.Replace.NONE;
 
-@Slf4j
 @DataJpaTest
-@AutoConfigureTestDatabase(replace = NONE)
+@Testcontainers
 class PostRepositoryTest {
 
-    @Autowired
-    private PostRepository repository;
+    @Container
+    static final PostgreSQLContainer<?> PG_CONTAINER = new PostgreSQLContainer<>("postgres:15-alpine");
 
     @Autowired
-    private EntityManager em;
+    PostRepository repository;
+
+    @Autowired
+    EntityManager em;
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", PG_CONTAINER::getJdbcUrl);
+        registry.add("spring.datasource.username", PG_CONTAINER::getUsername);
+        registry.add("spring.datasource.password", PG_CONTAINER::getPassword);
+    }
 
     @Test
     void testRepo() {
@@ -51,13 +63,14 @@ class PostRepositoryTest {
         ParameterExpression<String> pValue = cb.parameter(String.class);
 
         Join<Post, StatusTranslation> join = post.join("statusTranslations", JoinType.LEFT);
-        Predicate lang = cb.equal(join.get("id").get("locale"), pLocale);
-        Predicate value = cb.like(join.get("translation"), pValue);
-        join.on(cb.and(lang));
+        Path<String> translationPath = join.get("translation");
+        Predicate langCodePredicate = cb.equal(join.get("id").get("locale"), pLocale);
+        Predicate translationValuePredicate = cb.like(translationPath, pValue);
+        join.on(cb.and(langCodePredicate));
 
-        cq.multiselect(post, join.get("translation"));
-        cq.where(value);
-        cq.orderBy(cb.desc(join.get("translation")));
+        cq.multiselect(post, translationPath);
+        cq.where(translationValuePredicate);
+        cq.orderBy(cb.desc(translationPath));
 
         List<Tuple> list = em.createQuery(cq)
                 .setParameter(pLocale, locale)
@@ -65,8 +78,9 @@ class PostRepositoryTest {
                 .getResultList();
 
         assertEquals(1, list.size());
-        Post post1 = list.get(0).get(post);
-        post1.setStatusName(list.get(0).get(join.get("translation")));
+        Tuple tuple = list.get(0);
+        Post post1 = tuple.get(post);
+        post1.setStatusName(tuple.get(translationPath));
         assertEquals(UUID.fromString("ecb3041e-52f1-473f-bce3-736b8dbe1975"), post1.getId());
         assertEquals("В обработке", post1.getStatusName());
         // triggers new selects, don't use it: list.get(0).getStatusTranslations()

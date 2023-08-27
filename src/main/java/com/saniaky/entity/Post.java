@@ -15,6 +15,7 @@ import java.util.UUID;
 public class Post implements Serializable {
 
     @Id
+    // @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private UUID id;
 
@@ -24,7 +25,7 @@ public class Post implements Serializable {
 
     /**
      * Used for mapping only.
-     * Don't use it directly, since it might triggers additional selects.
+     * Don't use it directly, since it might trigger additional selects.
      */
     @Immutable
     @OneToMany(fetch = FetchType.LAZY)
@@ -44,7 +45,7 @@ public class Post implements Serializable {
     }
 
     public String getStatusName() {
-        String fallback = status != null ? status.name() : "unknown";
+        String fallback = status != null ? status.name() : "";
         return statusName != null ? statusName : fallback;
     }
 
